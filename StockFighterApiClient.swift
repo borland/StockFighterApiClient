@@ -78,9 +78,13 @@ class Venue {
         self.name = name
     }
     
-    func heartbeat() throws -> VenueHeartbeatResponse {
-        let d = try _httpClient.get("venues/\(name)/heartbeat") as! [String:AnyObject]
-        return VenueHeartbeatResponse(dictionary: d)
+    func heartbeat() -> VenueHeartbeatResponse {
+        do {
+            let d = try _httpClient.get("venues/\(name)/heartbeat") as! [String:AnyObject]
+            return VenueHeartbeatResponse(dictionary: d)
+        } catch {
+            return VenueHeartbeatResponse(ok:false, venue:name)
+        }
     }
     
     func stocks() throws -> StocksResponse {
@@ -210,6 +214,11 @@ struct ApiHeartbeatResponse {
 struct VenueHeartbeatResponse {
     let ok:Bool
     let venue:String
+    
+    init(ok:Bool, venue:String) {
+        self.ok = ok
+        self.venue = venue
+    }
     
     init(dictionary d:[String:AnyObject]) {
         ok = d["ok"] as! Bool
