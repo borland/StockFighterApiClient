@@ -42,12 +42,41 @@ You can then test it out by calling the `heartbeat` method
 You should see `ApiHeartbeatResponse(ok: true, error: "")` in the XCode console
 
 #### Interact with a venue
-Most of the things in StockFigher are stock trades on a stock exchange. StockFighter calls these venues. To interact with one, call the `venue` method to get a `Venue` object, and interact from there.
+Most of the things in StockFighter are stock trades on a stock exchange. StockFighter calls these venues. To interact with one, call the `venue` method to get a `Venue` object, and interact from there.
 
     let testEx = client.venue(account: "TESTACCOUNT", name: "TESTEX")
     print(testEx.heartbeat())
 	
 You should see `VenueHeartbeatResponse(ok: true, venue: "TESTEX")` in the XCode console
+
+#### List stocks
+
+    let stocks = try testEx.stocks()
+    
+StocksResponse is
+
+	struct StocksResponse {
+	    let ok:Bool
+	    let symbols:[Stock]
+	}
+	
+Stock is 
+
+	struct Stock {
+	    let name:String
+	    let symbol:String
+	}
+	
+#### Get the full order book for a stock
+You probably want to get quotes instead, or use the websocket, but if you want to get the current order book you call
+
+    let orders = try testEx.orderBookForStock("FOOBAR")
+    print(orders)
+
+#### Get a quote for a stock
+
+    let quote = try testEx.quoteForStock("FOOBAR")
+    print(quote)
 
 # Build Instructions:
 
