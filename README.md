@@ -11,7 +11,43 @@ If you'd rather code your own libraries, good on you!
 If you just want to play StockFighter and don't want to code up your own low level networking/protocol code, feel free to use this library.
 It's all under the MIT License so you can pretty much do whatever you'd like with it.
 
-Documentation, etc coming soon**.**
+Instructions to add this library to your project can be found below the documentation
+
+# Overview
+
+The client library provides methods to hit all the API methods at https://starfighter.readme.io, and handles JSON serialization, authorization, etc
+
+HTTP requests are done synchronously (they block your calling thread until they return); I may switch this to async in future but to get started synchronous requests are easier
+
+Access to the WebSocket endpoints is also provided, using [SocketRocket](https://github.com/square/SocketRocket) to do the heavy lifting. As you'll see in the Build Instructions, most of the work to set up the library is just to link in the SocketRocket framework
+
+The client library is designed to be simple and easy to use. As such, methods have descriptive names, and inputs are all just method parameters.
+There's no "command objects" or "transaction objects" or such things as I think they add unneccessary complexity at this level.
+
+Methods typically will return a response struct which will have public properties for each piece of data
+
+# Using the Api Client
+
+0. Get your StockFighter API key from the SF website, and save it into a text file. I called mine `persistent_key`.  Then add an entry to your `.gitignore` (or similar) to tell it not to track that file so you don't check your API key and publish it to github. You don't need to do this step as you can just pass your api key in as a string, but it's a good idea.
+
+#### Create an instance of `StockFighterApiClient`
+
+    let client = try! StockFighterApiClient(keyFile: "/path/to/keyfile")
+	
+You can then test it out by calling the `heartbeat` method
+
+    let response = client.heartbeat()
+    print(response)
+	
+You should see `ApiHeartbeatResponse(ok: true, error: "")` in the XCode console
+
+#### Interact with a venue
+Most of the things in StockFigher are stock trades on a stock exchange. StockFighter calls these venues. To interact with one, call the `venue` method to get a `Venue` object, and interact from there.
+
+    let testEx = client.venue(account: "TESTACCOUNT", name: "TESTEX")
+    print(testEx.heartbeat())
+	
+You should see `VenueHeartbeatResponse(ok: true, venue: "TESTEX")` in the XCode console
 
 # Build Instructions:
 
@@ -51,7 +87,7 @@ If you double click on it to see the relative path, it should be something like 
 
 Now you should be all good to go!
 
-##Note about SocketRocket:
+###Note about SocketRocket:
 
 This library uses SocketRocket for WebSocket connections. To make this easy I downloaded the latest
 SocketRocket distribution, extracted the Mac OS X (x64) framework, and put it in here.
