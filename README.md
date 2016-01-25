@@ -137,7 +137,7 @@ struct OrderResponse {
 }
 ```
 
-#### Get a quote for a stock
+#### Get a quote for a stock [(SF Documentation)](https://starfighter.readme.io/docs/a-quote-for-a-stock)
 
 ```swift
 let quote = try testExchange.quoteForStock("FOOBAR")
@@ -160,9 +160,72 @@ struct QuoteResponse {
 }
 ```
 
-#### Status for an Existing
+#### Status for an Existing Order [(SF Documentation)](https://starfighter.readme.io/docs/status-for-an-existing-order)
 
+```swift
+let status = try testExchange.orderStatusForStock("FOOBAR", id: order.id)
 
+// status is an OrderResponse, the same as returned from placing a new order
+```
+
+#### Cancel an Order [(SF Documentation)](https://starfighter.readme.io/docs/cancel-an-order)
+
+```swift
+let status = try testExchange.cancelOrderForStock("FOOBAR", id: order.id)
+
+// status is an OrderResponse, the same as returned from placing a new order
+```
+
+#### Status for all Orders - NOT IMPLEMENTED YET
+
+#### Status for all Orders in a Stock - NOT IMPLEMENTED YET
+
+#### Quotes/TickerTape Websocket [(SF Documentation)](https://starfighter.readme.io/docs/quotes-ticker-tape-websocket)
+
+The API provides a number of methods for using the StockFighter WebSocket api's.
+All these methods expect you to pass them a callback - whenever data is received over the WebSocket, your callback will be invoked.
+
+```swift
+let queue = dispatch_queue_create("callback_queue", nil)
+testExchange.tickerTapeForStock("FOOBAR", queue: queue) { quoteResponse in
+    // quoteResponse is a QuoteResponse, the same as from "Get a quote for a stock" above
+}
+```
+
+Or to get quotes for all stocks, you can call
+
+```swift
+testExchange.tickerTape(queue: queue) { quoteResponse in
+    // quoteResponse is a QuoteResponse, the same as "Get a quote for a stock" above
+}
+```
+
+**A note about websockets and asynchronous callbacks**
+All the HTTP methods run synchronously, so they can more than likely just run in the main thread of your Command Line app.
+The websocket will asynchronously call you back at random times, so it cannot run on the main thread. You must give it a queue to run it's callbacks on.
+The websocket and library are thread safe themselves, so you could use a Concurrent queue if you like.
+
+The main thing to consider is that if you're doing things on the main thread AND using websockets, you will probably need to add
+locking or something to avoid threading bugs.
+
+I'd recommend creating a single serial queue (`let queue = dispatch_queue_create("callback_queue", nil)`) and then running ALL your logic, both HTTP and websocket based, on that single queue to avoid threading issues
+
+#### Executions/Fills Websocket [(SF Documentation)](https://starfighter.readme.io/docs/executions-fills-websocket)
+
+```swift
+let queue = dispatch_queue_create("callback_queue", nil)
+testExchange.executionsForStock("FOOBAR", queue: queue) { orderResponse in
+    // orderResponse is an OrderResponse, the same as "Place a new order"
+}
+```
+
+Or to get executions for all stocks, you can call
+
+```swift
+testExchange.executions(queue: queue) { orderResponse in
+    // orderResponse is an OrderResponse, the same as "Place a new order"
+}
+```
 
 # Build Instructions:
 

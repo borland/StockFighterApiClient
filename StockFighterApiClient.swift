@@ -121,6 +121,11 @@ class Venue {
         return try OrderResponse(dictionary: d as! [String:AnyObject])
     }
     
+    func orderStatusForStock(symbol:String, id:Int) throws -> OrderResponse {
+        let d = try _httpClient.get("venues/\(name)/stocks/\(symbol)/orders/\(id)")
+        return try OrderResponse(dictionary: d as! [String:AnyObject])
+    }
+    
     /** Submits a request to cancel an outstanding order you've placed for a stock
     
     - Parameter symbol: The stock symbol
