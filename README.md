@@ -42,22 +42,21 @@ Now let's get going
 let client = try! StockFighterApiClient(keyFile: "/path/to/keyfile")
 ```
 
-You can then test it out by calling the [`heartbeat` method](https://starfighter.readme.io/docs/heartbeat)
-
-```swift
-let response = try client.heartbeat()
-print(response)
-```
-
-You should see `ApiHeartbeatResponse(ok: true, error: "")` in the XCode console, or else an error will be thrown.
-
-**Errors**:
 This method can throw 
 
 - `ClientErrors.CantReadKeyFile` if the keyFile can't be found
 - `ClientErrors.KeyFileInvalidFormat` if the keyFile doesn't contain readable UTF-8 text
 
 Both of these should probably be considered fatal errors, hence I've used `try!` in the example above
+
+You can then test it out by calling the [`heartbeat` method](https://starfighter.readme.io/docs/heartbeat)
+
+```swift
+let response = try client.heartbeat()
+print(response)
+```
+You should see `ApiHeartbeatResponse(ok: true, error: "")` in the XCode console, or else an error will be thrown if the network is down, etc.
+
 
 #### Interact with a venue
 Most of the things in StockFighter are stock trades on a stock exchange. StockFighter calls these venues. To interact with one, call the `venue` method to get a `Venue` object, and interact from there.
