@@ -15,21 +15,22 @@ Get your StockFighter API key from the SF website, and save it into a text file.
 You'll run into these as they're used in quite a few places.
 `OrderDirection` is self-explanatory, while `OrderType` is explained at https://starfighter.readme.io/docs/place-new-order#order-types
 
-    ```swift
-    enum OrderDirection {
-        case Buy, Sell
-    }
+```swift
+enum OrderDirection {
+    case Buy, Sell
+}
 
-    enum OrderType {
-        case Market, Limit, FillOrKill, ImmediateOrCancel
-    }
-    ```
+enum OrderType {
+    case Market, Limit, FillOrKill, ImmediateOrCancel
+}
+```
 
 **Errors:**
 All the methods can throw either an `NSError` returned from the underlying NSURLSession, or from JSON parsing, or they can throw
 
 - `ApiErrors.ServerError(String)` if the server returned ok: false with some error message (which will be available in the String)
-- `ApiErrors.UnexpectedJson(String)` if the server returned some JSON the client can't deal with
+- `ApiErrors.BadJson` if the server returned some JSON the client can't deal with
+- `ApiErrors.BadJsonForKey(String)` if the server returned some JSON the client can't deal with for a specific key value
 - `ApiErrors.CantParseDate(String)` if the server returned an unparseable DateTime string
 - `ApiErrors.CantParseEnum(String, String)` if the server returned a string value which can't be mapped to an enum (e.g. unknown OrderType)
 
@@ -37,18 +38,18 @@ Now let's get going
 
 #### Create an instance of `StockFighterApiClient`
 
-    ```swift
-    let client = try! StockFighterApiClient(keyFile: "/path/to/keyfile")
-    ```
-	
+```swift
+let client = try! StockFighterApiClient(keyFile: "/path/to/keyfile")
+```
+
 You can then test it out by calling the [`heartbeat` method](https://starfighter.readme.io/docs/heartbeat)
 
-    ```swift
-    let response = client.heartbeat()
-    print(response)
-    ```
-	
-You should see `ApiHeartbeatResponse(ok: true, error: "")` in the XCode console.
+```swift
+let response = try client.heartbeat()
+print(response)
+```
+
+You should see `ApiHeartbeatResponse(ok: true, error: "")` in the XCode console, or else an error will be thrown.
 
 **Errors**:
 This method can throw 
@@ -65,10 +66,10 @@ You can call the venue's [`heartbeat` method](https://starfighter.readme.io/docs
 
 ```swift
 let testExchange = client.venue(account: "EXB123456", name: "TESTEX")
-print(testExchange.heartbeat())
+print(try testExchange.heartbeat())
 ```
 
-You should see `VenueHeartbeatResponse(ok: true, venue: "TESTEX")` in the XCode console
+You should see `VenueHeartbeatResponse(ok: true, venue: "TESTEX")` in the XCode console, or else an error will be thrown.
 
 #### Stocks on a Venue [(SF Documentation)](https://starfighter.readme.io/docs/list-stocks-on-venue)
 
@@ -176,9 +177,21 @@ let status = try testExchange.cancelOrderForStock("FOOBAR", id: order.id)
 // status is an OrderResponse, the same as returned from placing a new order
 ```
 
-#### Status for all Orders - NOT IMPLEMENTED YET
+#### Status for all Orders - [(SF Documentation)](https://starfighter.readme.io/docs/status-for-all-orders)
 
-#### Status for all Orders in a Stock - NOT IMPLEMENTED YET
+```swift
+let statuses = try testExchange.accountOrderStatus()
+
+// statuses is an array of OrderResponse, the same as returned from placing a new order
+```
+
+#### Status for all Orders in a Stock - [(SF Documentation)](https://starfighter.readme.io/docs/status-for-all-orders-in-a-stock)
+
+```swift
+let statuses = try testExchange.accountOrderStatusForStock("FOOBAR")
+
+// statuses is an array of OrderResponse, the same as returned from placing a new order
+```
 
 #### Quotes/TickerTape Websocket [(SF Documentation)](https://starfighter.readme.io/docs/quotes-ticker-tape-websocket)
 
@@ -283,6 +296,8 @@ The client library is designed to be simple and easy to use. As such, methods ha
 There's no "command objects" or "transaction objects" or such things as I think they add unneccessary complexity at this level.
 
 Methods typically will return a response struct which will have public properties for each piece of data, which you can then access.
+
+In true real world fashion, the properties in the returned JSON from the StockFighter servers sometimes have weird and inconsistent names. The Api client tries to "smooth out the bumps" and normalize/clarify property names, so the response struct properties don't neccessarily map 100% to what the server JSON is sending back.
 
 Swift exceptions are used for things that might fail in important ways (Network error, unparseable JSON, StockFighter servers return a response). They're not used for trivial things (missing JSON element on an otherwise OK response). Generally you can just surround your main code with a do/catch and log any exceptions. In the normal case you won't get any.
 

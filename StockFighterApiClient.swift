@@ -23,7 +23,8 @@ enum ClientErrors : ErrorType {
 
 enum ApiErrors : ErrorType {
     case ServerError(String)
-    case UnexpectedJson(String)
+    case BadJson
+    case BadJsonForKey(String)
     case CantParseDate(String)
     case CantParseEnum(String, String)
 }
@@ -53,16 +54,9 @@ class StockFighterApiClient {
         _httpClient = HttpClient(baseUrlString:"https://api.stockfighter.io/ob/api/", httpHeaders: ["X-Starfighter-Authorization": apiKey])
     }
     
-    func heartbeat() -> ApiHeartbeatResponse {
-        do {
-            let d = try _httpClient.get("heartbeat") as! [String:AnyObject]
-            return ApiHeartbeatResponse(ok: d["ok"] as! Bool, error: d["error"] as! String)
-        } catch let e as NSError {
-            return ApiHeartbeatResponse(ok: false, error: e.localizedDescription)
-        }
-        catch let e {
-            return ApiHeartbeatResponse(ok: false, error: "Unexpected error! \(e)")
-        }
+    func heartbeat() throws -> ApiHeartbeatResponse {
+        guard let d = try _httpClient.get("heartbeat") as? [String:AnyObject] else { throw ApiErrors.BadJson }
+        return try ApiHeartbeatResponse(dictionary: d)
     }
     
     func venue(account account:String, name:String) -> Venue {
@@ -82,13 +76,9 @@ class Venue {
         self.name = name
     }
     
-    func heartbeat() -> VenueHeartbeatResponse {
-        do {
-            let d = try _httpClient.get("venues/\(name)/heartbeat") as! [String:AnyObject]
-            return VenueHeartbeatResponse(dictionary: d)
-        } catch {
-            return VenueHeartbeatResponse(ok:false, venue:name)
-        }
+    func heartbeat() throws -> VenueHeartbeatResponse {
+        guard let d = try _httpClient.get("venues/\(name)/heartbeat") as? [String:AnyObject] else { throw ApiErrors.BadJson }
+        return try VenueHeartbeatResponse(dictionary: d)
     }
     
     func stocks() throws -> StocksResponse {
@@ -125,6 +115,22 @@ class Venue {
         let d = try _httpClient.get("venues/\(name)/stocks/\(symbol)/orders/\(id)")
         return try OrderResponse(dictionary: d as! [String:AnyObject])
     }
+    
+    /** Gets the status of all orders related to your account */
+    func accountOrderStatus() throws -> [OrderResponse] {
+        let raw = try _httpClient.get("venues/\(name)/accounts/\(account)/orders")
+        guard let dict = raw as? [String:AnyObject] else { throw ApiErrors.BadJson }
+        guard let orders = dict["orders"] as? [[String:AnyObject]] else { throw ApiErrors.BadJsonForKey("orders") }
+        return try orders.map{ order in try OrderResponse(dictionary: order) }
+    }
+
+    func accountOrderStatusForStock(symbol:String) throws -> [OrderResponse] {
+        let raw = try _httpClient.get("venues/\(name)/accounts/\(account)/stocks/\(symbol)/orders")
+        guard let dict = raw as? [String:AnyObject] else { throw ApiErrors.BadJson }
+        guard let orders = dict["orders"] as? [[String:AnyObject]] else { throw ApiErrors.BadJsonForKey("orders") }
+        return try orders.map{ order in try OrderResponse(dictionary: order) }
+    }
+
     
     /** Submits a request to cancel an outstanding order you've placed for a stock
     
@@ -217,7 +223,13 @@ enum OrderType : String {
 
 struct ApiHeartbeatResponse {
     let ok:Bool
-    let error:String
+    
+    init(dictionary d:[String:AnyObject]) throws {
+        ok = d["ok"] as? Bool ?? false
+        if let msg = d["error"] as? String where ok == false {
+            throw ApiErrors.ServerError(msg)
+        }
+    }
 }
 
 struct VenueHeartbeatResponse {
@@ -229,8 +241,11 @@ struct VenueHeartbeatResponse {
         self.venue = venue
     }
     
-    init(dictionary d:[String:AnyObject]) {
-        ok = d["ok"] as! Bool
+    init(dictionary d:[String:AnyObject]) throws {
+        ok = d["ok"] as? Bool ?? false
+        if let msg = d["error"] as? String where ok == false {
+            throw ApiErrors.ServerError(msg)
+        }
         venue = d["venue"] as! String
     }
 }
@@ -245,9 +260,12 @@ struct StocksResponse {
     let symbols:[Stock]
     
     init(dictionary d:[String:AnyObject]) throws {
-        guard let symbolsArr = d["symbols"] as? [[String:String]] else { throw ApiErrors.UnexpectedJson("symbols") }
+        guard let symbolsArr = d["symbols"] as? [[String:String]] else { throw ApiErrors.BadJsonForKey("symbols") }
         
-        ok = d["ok"] as! Bool
+        ok = d["ok"] as? Bool ?? false
+        if let msg = d["error"] as? String where ok == false {
+            throw ApiErrors.ServerError(msg)
+        }
         symbols = symbolsArr.map{ s in Stock(name: s["name"]!, symbol: s["symbol"]!) }
     }
 }
@@ -278,7 +296,10 @@ struct OrderBookResponse {
         
         let transform = { (x:[String:AnyObject]) in OrderBookOrder(dictionary: x) }
         
-        ok = d["ok"] as! Bool
+        ok = d["ok"] as? Bool ?? false
+        if let msg = d["error"] as? String where ok == false {
+            throw ApiErrors.ServerError(msg)
+        }
         venue = d["venue"] as! String
         symbol = d["symbol"] as! String
         bids = bidsArr.map(transform)
@@ -317,6 +338,10 @@ struct OrderResponse {
     
     init(dictionary d:[String:AnyObject]) throws {
         ok = d["ok"] as? Bool ?? true // if we come in via the websocket ok isn't present (it's in the parent)
+        if let msg = d["error"] as? String where ok == false {
+            throw ApiErrors.ServerError(msg)
+        }
+        
         venue = d["venue"] as! String
         symbol = d["symbol"] as! String
         direction = OrderDirection(rawValue: d["direction"] as! String)!
@@ -350,6 +375,9 @@ struct QuoteResponse {
     
     init(dictionary d:[String:AnyObject]) throws {
         ok = d["ok"] as? Bool ?? true // if we come in via a websocket then OK is missing but it exists in the outer response
+        if let msg = d["error"] as? String where ok == false {
+            throw ApiErrors.ServerError(msg)
+        }
         venue = d["venue"] as! String
         symbol =  d["symbol"] as! String
         bidBestPrice = d["bid"] as? Int // may not be present in the response
