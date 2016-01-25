@@ -13,13 +13,17 @@ func parseDate(str:String) throws -> NSDate {
     let formatter = NSDateFormatter()
     formatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSSZ"
     
-    guard let d = formatter.dateFromString(str) else { throw ClientErrors.CantParseDate(str) }
+    guard let d = formatter.dateFromString(str) else { throw ApiErrors.CantParseDate(str) }
     return d
 }
 
 enum ClientErrors : ErrorType {
     case CantReadKeyFile, KeyFileInvalidFormat
-    case UnexpectedJsonFor(String)
+}
+
+enum ApiErrors : ErrorType {
+    case ServerError(String)
+    case UnexpectedJson(String)
     case CantParseDate(String)
     case CantParseEnum(String, String)
 }
@@ -236,7 +240,7 @@ struct StocksResponse {
     let symbols:[Stock]
     
     init(dictionary d:[String:AnyObject]) throws {
-        guard let symbolsArr = d["symbols"] as? [[String:String]] else { throw ClientErrors.UnexpectedJsonFor("symbols") }
+        guard let symbolsArr = d["symbols"] as? [[String:String]] else { throw ApiErrors.UnexpectedJson("symbols") }
         
         ok = d["ok"] as! Bool
         symbols = symbolsArr.map{ s in Stock(name: s["name"]!, symbol: s["symbol"]!) }

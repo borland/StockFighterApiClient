@@ -63,102 +63,102 @@ Most of the things in StockFighter are stock trades on a stock exchange. StockFi
 
 You can call the venue's [`heartbeat` method](https://starfighter.readme.io/docs/heartbeat) to see if it's alive
 
-    ```swift
-    let testExchange = client.venue(account: "EXB123456", name: "TESTEX")
-    print(testExchange.heartbeat())
-    ```
-	
+```swift
+let testExchange = client.venue(account: "EXB123456", name: "TESTEX")
+print(testExchange.heartbeat())
+```
+
 You should see `VenueHeartbeatResponse(ok: true, venue: "TESTEX")` in the XCode console
 
 #### Stocks on a Venue [(SF Documentation)](https://starfighter.readme.io/docs/list-stocks-on-venue)
 
-    ```swift
-    let stocks = try testExchange.stocks()
-    
-    // stocks is a StocksResponse, which is:
-	struct StocksResponse {
-	    let ok:Bool
-	    let symbols:[Stock]
-	}
-	
-    // Stock is:
-	struct Stock {
-	    let name:String
-	    let symbol:String
-	}
-    ```
-	
+```swift
+let stocks = try testExchange.stocks()
+
+// stocks is a StocksResponse, which is:
+struct StocksResponse {
+    let ok:Bool
+    let symbols:[Stock]
+}
+
+// Stock is:
+struct Stock {
+    let name:String
+    let symbol:String
+}
+```
+
 #### Get the full order book for a stock [(SF Documentation)](https://starfighter.readme.io/docs/get-orderbook-for-stock)
 You probably want to get quotes instead, or use the websocket, but if you want to get the current order book you call
 
-    ```swift
-    let orders = try testExchange.orderBookForStock("FOOBAR")
-	
-    // orders is an OrderBookResponse, which is:
-	struct OrderBookResponse {
-	    let ok:Bool
-	    let venue:String
-	    let symbol:String
-	    let bids:[OrderBookOrder]
-	    let asks:[OrderBookOrder]
-	    let timeStamp:NSDate
-	}
-	
-	// OrderBookOrder is:
-	struct OrderBookOrder {
-	    let price:Int
-	    let qty:Int
-	    let isBuy:Bool
-	}
-    ```
+```swift
+let orders = try testExchange.orderBookForStock("FOOBAR")
+
+// orders is an OrderBookResponse, which is:
+struct OrderBookResponse {
+    let ok:Bool
+    let venue:String
+    let symbol:String
+    let bids:[OrderBookOrder]
+    let asks:[OrderBookOrder]
+    let timeStamp:NSDate
+}
+
+// OrderBookOrder is:
+struct OrderBookOrder {
+    let price:Int
+    let qty:Int
+    let isBuy:Bool
+}
+```
 
 
 #### Place a new order [(SF Documentation)](https://starfighter.readme.io/docs/place-new-order#order-types)
 
-    ```swift
-    let order = try testExchange.placeOrderForStock("FOOBAR", price: 100, qty: 10, direction: .Buy)
-	
-	// order is an OrderResponse, which is:
-	struct OrderResponse {
-	    let ok:Bool
-	    let venue:String
-	    let symbol:String
-	    let direction:OrderDirection
-	    let originalQty:Int
-	    let outstandingQty:Int // this is the quantity *left outstanding*
-	    let price:Int // the price on the order -- may not match that of fills!
-	    let type: OrderType
-	    let id:Int // guaranteed unique *on this venue*
-	    let account:String
-	    let timeStamp:NSDate // ISO-8601 timestamp for when we received order
-	    let fills:[OrderFill] // may have zero or multiple fills.
-	    let totalFilled:Int
-	    let open:Bool
-	}
-    ```
+```swift
+let order = try testExchange.placeOrderForStock("FOOBAR", price: 100, qty: 10, direction: .Buy)
+
+// order is an OrderResponse, which is:
+struct OrderResponse {
+    let ok:Bool
+    let venue:String
+    let symbol:String
+    let direction:OrderDirection
+    let originalQty:Int
+    let outstandingQty:Int // this is the quantity *left outstanding*
+    let price:Int // the price on the order -- may not match that of fills!
+    let type: OrderType
+    let id:Int // guaranteed unique *on this venue*
+    let account:String
+    let timeStamp:NSDate // ISO-8601 timestamp for when we received order
+    let fills:[OrderFill] // may have zero or multiple fills.
+    let totalFilled:Int
+    let open:Bool
+}
+```
 
 #### Get a quote for a stock
 
-    ```swift
-    let quote = try testExchange.quoteForStock("FOOBAR")
-    
-	// quote is a QuoteResponse, which is:
-	struct QuoteResponse {
-	    let ok:Bool // true
-	    let venue:String // venue identifier
-	    let symbol:String // stock symbol
-	    let bidBestPrice:Int? // best price currently bid for the stock, which may not be present
-	    let askBestPrice:Int? // // best price currently offered for the stock, which may not be present
-	    let bidSize:Int // aggregate size of all orders at the best bid
-	    let askSize:Int // aggregate size of all orders at the best ask
-	    let bidDepth:Int  // aggregate size of *all bids*
-	    let askDepth:Int // aggregate size of *all asks*
-	    let lastTradePrice:Int // price of last trade
-	    let lastTradeSize:Int // quantity of last trade
-	    let lastTradeTimeStamp:NSDate // timestamp of last trade
-	    let quoteTimeStamp:NSDate // ts we last updated quote at (server-side)
-	}
-	```
+```swift
+let quote = try testExchange.quoteForStock("FOOBAR")
+
+// quote is a QuoteResponse, which is:
+struct QuoteResponse {
+    let ok:Bool // true
+    let venue:String // venue identifier
+    let symbol:String // stock symbol
+    let bidBestPrice:Int? // best price currently bid for the stock, which may not be present
+    let askBestPrice:Int? // // best price currently offered for the stock, which may not be present
+    let bidSize:Int // aggregate size of all orders at the best bid
+    let askSize:Int // aggregate size of all orders at the best ask
+    let bidDepth:Int  // aggregate size of *all bids*
+    let askDepth:Int // aggregate size of *all asks*
+    let lastTradePrice:Int // price of last trade
+    let lastTradeSize:Int // quantity of last trade
+    let lastTradeTimeStamp:NSDate // timestamp of last trade
+    let quoteTimeStamp:NSDate // ts we last updated quote at (server-side)
+}
+```
 
 #### Status for an Existing
 
