@@ -1,34 +1,11 @@
 # StockFighterApiClient
 
-This is a client library written in swift for [StockFighter](https://www.stockfighter.io/ui/account):
+This is a client library written in swift for [StockFighter](https://www.stockfighter.io/ui/account).
 
+The client library provides methods to hit all the API methods at https://starfighter.readme.io, and handles JSON serialization, authorization, etc. 
 Instructions to add this library to your project can be found below the documentation
 
-The client library provides methods to hit all the API methods at https://starfighter.readme.io, and handles JSON serialization, authorization, etc
-
 Access to the WebSocket endpoints is also provided, using [SocketRocket](https://github.com/square/SocketRocket) to do the heavy lifting. As you'll see in the Build Instructions, most of the work to set up the library is just to link in the SocketRocket framework
-
-**Design**
-
-The client library is designed to be simple and easy to use. As such, methods have descriptive names, and inputs are all just method parameters.
-There's no "command objects" or "transaction objects" or such things as I think they add unneccessary complexity at this level.
-
-Methods typically will return a response struct which will have public properties for each piece of data, which you can then access.
-
-Swift exceptions are used for things that might fail in important ways (Network error, unparseable JSON, StockFighter servers return a response). They're not used for trivial things (missing JSON element on an otherwise OK response). Generally you can just surround your main code with a do/catch and log any exceptions. In the normal case you won't get any.
-
-HTTP requests are done synchronously (they block your calling thread until they return); I may switch this to async in future but to get started synchronous requests are easier.
-
-**Why write this?**
-- I wanted to try playing StockFighter
-- I wanted to use swift, because I really like swift as a language
-- I wanted to write the library from scratch as a learning/practice exercise
-- It's always nice to put more open source code up online to (hopefully) help other people, and help my Resume/CV in future should I ever need that.
-
-If you just want to play StockFighter and don't want to code up your own low level networking/protocol code, feel free to use this library.
-It's all under the MIT License so you can pretty much do whatever you'd like with it.
-
-If you'd rather code your own libraries, good on you!
 
 # Using the Api Client
 
@@ -38,14 +15,15 @@ Get your StockFighter API key from the SF website, and save it into a text file.
 You'll run into these as they're used in quite a few places.
 `OrderDirection` is self-explanatory, while `OrderType` is explained at https://starfighter.readme.io/docs/place-new-order#order-types
 
-	enum OrderDirection {
-	    case Buy, Sell
-	}
+    ```swift
+    enum OrderDirection {
+        case Buy, Sell
+    }
 
-	enum OrderType {
-	    case Market, Limit, FillOrKill, ImmediateOrCancel
-	}
-    
+    enum OrderType {
+        case Market, Limit, FillOrKill, ImmediateOrCancel
+    }
+    ```
 
 **Errors:**
 All the methods can throw either an `NSError` returned from the underlying NSURLSession, or from JSON parsing, or they can throw
@@ -59,12 +37,16 @@ Now let's get going
 
 #### Create an instance of `StockFighterApiClient`
 
+    ```swift
     let client = try! StockFighterApiClient(keyFile: "/path/to/keyfile")
+    ```
 	
 You can then test it out by calling the [`heartbeat` method](https://starfighter.readme.io/docs/heartbeat)
 
+    ```swift
     let response = client.heartbeat()
     print(response)
+    ```
 	
 You should see `ApiHeartbeatResponse(ok: true, error: "")` in the XCode console.
 
@@ -81,13 +63,16 @@ Most of the things in StockFighter are stock trades on a stock exchange. StockFi
 
 You can call the venue's [`heartbeat` method](https://starfighter.readme.io/docs/heartbeat) to see if it's alive
 
+    ```swift
     let testExchange = client.venue(account: "EXB123456", name: "TESTEX")
     print(testExchange.heartbeat())
+    ```
 	
 You should see `VenueHeartbeatResponse(ok: true, venue: "TESTEX")` in the XCode console
 
 #### Stocks on a Venue [(SF Documentation)](https://starfighter.readme.io/docs/list-stocks-on-venue)
 
+    ```swift
     let stocks = try testExchange.stocks()
     
     // stocks is a StocksResponse, which is:
@@ -101,10 +86,12 @@ You should see `VenueHeartbeatResponse(ok: true, venue: "TESTEX")` in the XCode 
 	    let name:String
 	    let symbol:String
 	}
+    ```
 	
 #### Get the full order book for a stock [(SF Documentation)](https://starfighter.readme.io/docs/get-orderbook-for-stock)
 You probably want to get quotes instead, or use the websocket, but if you want to get the current order book you call
 
+    ```swift
     let orders = try testExchange.orderBookForStock("FOOBAR")
 	
     // orders is an OrderBookResponse, which is:
@@ -123,10 +110,12 @@ You probably want to get quotes instead, or use the websocket, but if you want t
 	    let qty:Int
 	    let isBuy:Bool
 	}
+    ```
 
 
 #### Place a new order [(SF Documentation)](https://starfighter.readme.io/docs/place-new-order#order-types)
 
+    ```swift
     let order = try testExchange.placeOrderForStock("FOOBAR", price: 100, qty: 10, direction: .Buy)
 	
 	// order is an OrderResponse, which is:
@@ -146,8 +135,11 @@ You probably want to get quotes instead, or use the websocket, but if you want t
 	    let totalFilled:Int
 	    let open:Bool
 	}
+    ```
+
 #### Get a quote for a stock
 
+    ```swift
     let quote = try testExchange.quoteForStock("FOOBAR")
     
 	// quote is a QuoteResponse, which is:
@@ -166,7 +158,8 @@ You probably want to get quotes instead, or use the websocket, but if you want t
 	    let lastTradeTimeStamp:NSDate // timestamp of last trade
 	    let quoteTimeStamp:NSDate // ts we last updated quote at (server-side)
 	}
-	
+	```
+
 #### Status for an Existing
 
 
@@ -220,3 +213,25 @@ The OSX SocketRocket hasn't been updated in a while, and as such
  
 I've fixed both of those things so SocketRocket could be pulled in nicely without any Objective-C bridging headers, etc.
 Will look at sending those fixes upstream at some point
+
+# Design / Notes
+
+The client library is designed to be simple and easy to use. As such, methods have descriptive names, and inputs are all just method parameters.
+There's no "command objects" or "transaction objects" or such things as I think they add unneccessary complexity at this level.
+
+Methods typically will return a response struct which will have public properties for each piece of data, which you can then access.
+
+Swift exceptions are used for things that might fail in important ways (Network error, unparseable JSON, StockFighter servers return a response). They're not used for trivial things (missing JSON element on an otherwise OK response). Generally you can just surround your main code with a do/catch and log any exceptions. In the normal case you won't get any.
+
+HTTP requests are done synchronously (they block your calling thread until they return); I may switch this to async in future but to get started synchronous requests are easier.
+
+**Why write this?**
+- I wanted to try playing StockFighter
+- I wanted to use swift, because I really like swift as a language
+- I wanted to write the library from scratch as a learning/practice exercise
+- It's always nice to put more open source code up online to (hopefully) help other people, and help my Resume/CV in future should I ever need that.
+
+If you just want to play StockFighter and don't want to code up your own low level networking/protocol code, feel free to use this library.
+It's all under the MIT License so you can pretty much do whatever you'd like with it.
+
+If you'd rather code your own libraries, good on you!
