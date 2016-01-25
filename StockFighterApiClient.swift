@@ -373,7 +373,7 @@ struct QuoteResponse {
     let askSize:Int // aggregate size of all orders at the best ask
     let bidDepth:Int  // aggregate size of *all bids*
     let askDepth:Int // aggregate size of *all asks*
-    let lastTradePrice:Int // price of last trade
+    let lastTradePrice:Int? // price of last trade
     let lastTradeSize:Int // quantity of last trade
     let lastTradeTimeStamp:NSDate // timestamp of last trade
     let quoteTimeStamp:NSDate // ts we last updated quote at (server-side)
@@ -387,12 +387,12 @@ struct QuoteResponse {
         symbol =  d["symbol"] as! String
         bidBestPrice = d["bid"] as? Int // may not be present in the response
         askBestPrice = d["ask"] as? Int // may not be present in the response
-        bidSize = d["bidSize"] as! Int
-        askSize = d["askSize"] as! Int
-        bidDepth = d["bidDepth"] as! Int
-        askDepth = d["askDepth"] as! Int
-        lastTradePrice = d["last"] as! Int
-        lastTradeSize = d["lastSize"] as! Int
+        bidSize = d["bidSize"] as? Int ?? 0
+        askSize = d["askSize"] as? Int ?? 0
+        bidDepth = d["bidDepth"] as? Int ?? 0
+        askDepth = d["askDepth"] as? Int ?? 0
+        lastTradePrice = d["last"] as? Int
+        lastTradeSize = d["lastSize"] as? Int ?? 0
         lastTradeTimeStamp = try parseDate(d["lastTrade"] as! String)
         quoteTimeStamp = try parseDate(d["quoteTime"] as! String)
     }
