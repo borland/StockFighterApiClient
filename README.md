@@ -200,7 +200,7 @@ All these methods expect you to pass them a callback - whenever data is received
 
 ```swift
 let queue = dispatch_queue_create("callback_queue", nil)
-testExchange.tickerTapeForStock("FOOBAR", queue: queue) { quoteResponse in
+let ws = testExchange.tickerTapeForStock("FOOBAR", queue: queue) { quoteResponse in
     // quoteResponse is a QuoteResponse, the same as from "Get a quote for a stock" above
 }
 ```
@@ -208,10 +208,17 @@ testExchange.tickerTapeForStock("FOOBAR", queue: queue) { quoteResponse in
 Or to get quotes for all stocks, you can call
 
 ```swift
-testExchange.tickerTape(queue: queue) { quoteResponse in
+let ws = testExchange.tickerTape(queue: queue) { quoteResponse in
     // quoteResponse is a QuoteResponse, the same as "Get a quote for a stock" above
 }
 ```
+
+**Closing the websocket**
+The websocket methods return a reference to an internal `WebSocketClient` object, which you don't really need to care about, EXCEPT for keeping it alive.
+
+In the examples above, I've assigned it to a `ws` variable. When that variable goes out of scope, the `WebSocketClient` will get dealloc'ed, and it will close. If you forget to assign the result of a websocket method, or if you let the returned value go out of scope, your WebSocket will be closed and you'll be scratching your head as to why you're not getting any callbacks.
+
+If you want to explicitly close the websocket, you can call the `.close()` method on the returned WebSocketClient object
 
 **A note about websockets and asynchronous callbacks**
 All the HTTP methods run synchronously, so they can more than likely just run in the main thread of your Command Line app.
@@ -227,7 +234,7 @@ I'd recommend creating a single serial queue (`let queue = dispatch_queue_create
 
 ```swift
 let queue = dispatch_queue_create("callback_queue", nil)
-testExchange.executionsForStock("FOOBAR", queue: queue) { orderResponse in
+let ws = testExchange.executionsForStock("FOOBAR", queue: queue) { orderResponse in
     // orderResponse is an OrderResponse, the same as "Place a new order"
 }
 ```
@@ -235,10 +242,12 @@ testExchange.executionsForStock("FOOBAR", queue: queue) { orderResponse in
 Or to get executions for all stocks, you can call
 
 ```swift
-testExchange.executions(queue: queue) { orderResponse in
+let ws = testExchange.executions(queue: queue) { orderResponse in
     // orderResponse is an OrderResponse, the same as "Place a new order"
 }
 ```
+
+**Please pay attention to the sections about Closing the websocket and the Asynchronous callbacks above**
 
 # Build Instructions:
 

@@ -82,17 +82,17 @@ class Venue {
     }
     
     func stocks() throws -> StocksResponse {
-        let d = try _httpClient.get("venues/\(name)/stocks") as! [String:AnyObject]
+        guard let d = try _httpClient.get("venues/\(name)/stocks") as? [String:AnyObject] else { throw ApiErrors.BadJson }
         return try StocksResponse(dictionary: d)
     }
     
     func orderBookForStock(symbol:String) throws -> OrderBookResponse {
-        let d = try _httpClient.get("venues/\(name)/stocks/\(symbol)") as! [String:AnyObject]
+        guard let d = try _httpClient.get("venues/\(name)/stocks/\(symbol)") as? [String:AnyObject] else { throw ApiErrors.BadJson }
         return try OrderBookResponse(dictionary: d)
     }
     
     func quoteForStock(symbol:String) throws -> QuoteResponse {
-        let d = try _httpClient.get("venues/\(name)/stocks/\(symbol)/quote") as! [String:AnyObject]
+        guard let d = try _httpClient.get("venues/\(name)/stocks/\(symbol)/quote") as? [String:AnyObject] else { throw ApiErrors.BadJson }
         return try QuoteResponse(dictionary: d)
     }
     
@@ -107,16 +107,18 @@ class Venue {
             "orderType":type.rawValue
         ]
 
-        let d = try _httpClient.post("venues/\(name)/stocks/\(symbol)/orders", body: request)
-        return try OrderResponse(dictionary: d as! [String:AnyObject])
+        guard let d = try _httpClient.post("venues/\(name)/stocks/\(symbol)/orders", body: request) as? [String:AnyObject] else { throw ApiErrors.BadJson }
+        return try OrderResponse(dictionary: d)
     }
     
     func orderStatusForStock(symbol:String, id:Int) throws -> OrderResponse {
-        let d = try _httpClient.get("venues/\(name)/stocks/\(symbol)/orders/\(id)")
-        return try OrderResponse(dictionary: d as! [String:AnyObject])
+        guard let d = try _httpClient.get("venues/\(name)/stocks/\(symbol)/orders/\(id)") as? [String:AnyObject] else { throw ApiErrors.BadJson }
+        return try OrderResponse(dictionary: d)
     }
     
-    /** Gets the status of all orders related to your account */
+    /** Gets the status of all orders related to your account 
+    - Returns: Array of OrderResponse
+     - Throws: ApiErrors.BadJson, ApiErrors.CantParseDate or an NSError */
     func accountOrderStatus() throws -> [OrderResponse] {
         let raw = try _httpClient.get("venues/\(name)/accounts/\(account)/orders")
         guard let dict = raw as? [String:AnyObject] else { throw ApiErrors.BadJson }
@@ -124,6 +126,10 @@ class Venue {
         return try orders.map{ order in try OrderResponse(dictionary: order) }
     }
 
+    /** Gets the status of all orders related to your account for a particular stock
+    - Parameter symbol: The stock symbol
+    - Returns: Array of OrderResponse
+    - Throws: ApiErrors.BadJson, ApiErrors.CantParseDate or an NSError */
     func accountOrderStatusForStock(symbol:String) throws -> [OrderResponse] {
         let raw = try _httpClient.get("venues/\(name)/accounts/\(account)/stocks/\(symbol)/orders")
         guard let dict = raw as? [String:AnyObject] else { throw ApiErrors.BadJson }
@@ -133,14 +139,13 @@ class Venue {
 
     
     /** Submits a request to cancel an outstanding order you've placed for a stock
-    
     - Parameter symbol: The stock symbol
     - Parameter id: The order id (returned as part of the OrderResponse when you called placeOrderForStock
     - Returns: an OrderResponse
-    - Throws: ClientErrors.CantParseDate */
+    - Throws: ApiErrors.BadJson, ApiErrors.CantParseDate or an NSError */
     func cancelOrderForStock(symbol:String, id:Int) throws -> OrderResponse {
-        let d = try _httpClient.delete("venues/\(name)/stocks/\(symbol)/orders/\(id)")
-        return try OrderResponse(dictionary: d as! [String:AnyObject])
+        guard let d = try _httpClient.delete("venues/\(name)/stocks/\(symbol)/orders/\(id)") as? [String:AnyObject] else { throw ApiErrors.BadJson }
+        return try OrderResponse(dictionary: d)
     }
     
     // returns a websocketClient. It's up to the caller to close the client when done
