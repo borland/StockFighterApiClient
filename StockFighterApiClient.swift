@@ -9,12 +9,13 @@
 import Foundation
 
 
-func parseDate(str:String) throws -> NSDate {
+func parseDate(str:String?) -> NSDate? {
+    guard let string = str else { return nil }
+    
     let formatter = NSDateFormatter()
     formatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSSZ"
     
-    guard let d = formatter.dateFromString(str) else { throw ApiErrors.CantParseDate(str) }
-    return d
+    return formatter.dateFromString(string)
 }
 
 enum ClientErrors : ErrorType {
@@ -309,7 +310,10 @@ struct OrderBookResponse {
         symbol = d["symbol"] as! String
         bids = bidsArr.map(transform)
         asks = asksArr.map(transform)
-        timeStamp = try parseDate(d["ts"] as! String)
+        
+        let ts = d["ts"] as? String
+        guard let parsedTs = parseDate(ts) else { throw ApiErrors.CantParseDate(ts ?? "") }
+        timeStamp = parsedTs
     }
 }
 
@@ -319,9 +323,12 @@ struct OrderFill {
     let timeStamp: NSDate
     
     init(dictionary:[String:AnyObject]) throws {
+        let ts = dictionary["ts"] as? String
+        guard let parsedTs = parseDate(ts) else { throw ApiErrors.CantParseDate(ts ?? "") }
+        
         price = dictionary["price"] as! Int
         qty = dictionary["qty"] as! Int
-        timeStamp = try parseDate(dictionary["ts"] as! String)
+        timeStamp = parsedTs
     }
 }
 
@@ -356,10 +363,13 @@ struct OrderResponse {
         type = OrderType(rawValue: d["orderType"] as! String)! // docs are wrong, this comes through as "orderType", not "type"
         id = d["id"] as! Int
         account = d["account"] as! String
-        timeStamp = try parseDate(d["ts"] as! String)
         self.fills = try (d["fills"] as? [[String:AnyObject]] ?? []).map{ x in try OrderFill(dictionary: x) }
         totalFilled = d["totalFilled"] as! Int
         open = d["open"] as! Bool
+        
+        let ts = d["ts"] as? String
+        guard let parsedTs = parseDate(ts) else { throw ApiErrors.CantParseDate(ts ?? "") }
+        timeStamp = parsedTs
     }
 }
 
@@ -375,7 +385,7 @@ struct QuoteResponse {
     let askDepth:Int // aggregate size of *all asks*
     let lastTradePrice:Int? // price of last trade
     let lastTradeSize:Int // quantity of last trade
-    let lastTradeTimeStamp:NSDate // timestamp of last trade
+    let lastTradeTimeStamp:NSDate? // optional timestamp of last trade
     let quoteTimeStamp:NSDate // ts we last updated quote at (server-side)
     
     init(dictionary d:[String:AnyObject]) throws {
@@ -393,7 +403,10 @@ struct QuoteResponse {
         askDepth = d["askDepth"] as? Int ?? 0
         lastTradePrice = d["last"] as? Int
         lastTradeSize = d["lastSize"] as? Int ?? 0
-        lastTradeTimeStamp = try parseDate(d["lastTrade"] as! String)
-        quoteTimeStamp = try parseDate(d["quoteTime"] as! String)
+        lastTradeTimeStamp = parseDate(d["lastTrade"] as? String)
+        
+        let ts = d["quoteTime"] as? String
+        guard let parsedTs = parseDate(ts) else { throw ApiErrors.CantParseDate(ts ?? "") }
+        quoteTimeStamp = parsedTs
     }
 }

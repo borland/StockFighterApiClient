@@ -40,7 +40,7 @@ class StockFighterGmClient {
     - Throws: An NSError from JSON deserialization or an error from `HttpErrors` for invalid HTTP response code, etc */
     func startLevel(level:String) throws -> StartLevelResponse {
         let d = try _httpClient.post("levels/\(level)") as! [String:AnyObject]
-        return StartLevelResponse(dictionary: d)
+        return try StartLevelResponse(dictionary: d)
     }
     
     func getLevelInstance(instanceId:Int) throws -> LevelStatus {
@@ -67,7 +67,7 @@ class StockFighterGmClient {
      - Throws: An error from `HttpErrors` for invalid HTTP response code, etc */
     func resumeLevelInstance(instanceId:Int) throws -> StartLevelResponse {
         let d = try _httpClient.post("instances/\(instanceId)/resume")
-        return StartLevelResponse(dictionary: d as! [String : AnyObject])
+        return try StartLevelResponse(dictionary: d as! [String : AnyObject])
     }
 }
 
@@ -81,8 +81,12 @@ struct StartLevelResponse {
     let balances:[String:Int]
     let instructions: [String:String]
     
-    init(dictionary d:[String:AnyObject]) {
-        ok = d["ok"] as! Bool
+    init(dictionary d:[String:AnyObject]) throws {
+        ok = d["ok"] as? Bool ?? false
+        if let msg = d["error"] as? String where ok == false {
+            throw ApiErrors.ServerError(msg)
+        }
+        
         account = d["account"] as! String
         instanceId = d["instanceId"] as! Int
         secondsPerTradingDay = d["secondsPerTradingDay"] as! Int
