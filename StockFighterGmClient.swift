@@ -43,9 +43,10 @@ class StockFighterGmClient {
         return try StartLevelResponse(dictionary: d)
     }
     
-    func getLevelInstance(instanceId:Int) throws -> LevelStatus {
+    /** Gets information about the current level (which trading day, etc) */
+    func getLevelStatus(instanceId:Int) throws -> LevelStatus {
         let d = try _httpClient.get("instances/\(instanceId)") as! [String:AnyObject]
-        return LevelStatus(dictionary: d)
+        return try LevelStatus(dictionary: d)
     }
 
     /** Restarts a level
@@ -105,8 +106,11 @@ struct LevelStatus {
     let tradingDay:Int
     let endOfTheWorldDay:Int
     
-    init(dictionary d:[String:AnyObject]) {
-        ok = d["ok"] as! Bool
+    init(dictionary d:[String:AnyObject]) throws {
+        ok = d["ok"] as? Bool ?? false
+        if let msg = d["error"] as? String where ok == false {
+            throw ApiErrors.ServerError(msg)
+        }
         done = d["done"] as! Bool
         instanceId = d["id"] as! Int
         state = d["state"] as! String
