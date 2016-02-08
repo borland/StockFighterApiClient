@@ -32,27 +32,34 @@ enum ApiErrors : ErrorType {
 
 /** This class handles interaction with the official StockFighter API as documented at https://starfighter.readme.io */
 class StockFighterApiClient {
+    let queue: dispatch_queue_t
     private let _httpClient:HttpClient
+    private let _asyncHttpClient:AsyncHttpClient
 
     /** Inits the client with a file containing your API key.
      This is good because you can put your API key in a separate file, reference it here, but EXCLUDE that file from source control
      as you don't want to be publishing your API key on GitHub (even though StockFighter is just a game)
      
      - Parameter keyFile: Path to a text file which contains your API key */
-    convenience init(keyFile:String) throws {
+    convenience init(keyFile:String, queue: dispatch_queue_t) throws {
         guard let keyData = NSFileManager.defaultManager().contentsAtPath(keyFile) else {
             throw ClientErrors.CantReadKeyFile
         }
         guard let key = NSString(data: keyData, encoding: NSUTF8StringEncoding) as? String else {
             throw ClientErrors.KeyFileInvalidFormat
         }
-        self.init(apiKey: key)
+        self.init(apiKey: key, queue: queue)
     }
     
     /** Inits the client with your API key. You should probably call `init(keyFile)` instead of this
     - Parameter apiKey: Your API key */
-    init(apiKey:String) {
-        _httpClient = HttpClient(baseUrlString:"https://api.stockfighter.io/ob/api/", httpHeaders: ["X-Starfighter-Authorization": apiKey])
+    init(apiKey:String, queue: dispatch_queue_t) {
+        let baseUrl = "https://api.stockfighter.io/ob/api/"
+        let headers = ["X-Starfighter-Authorization": apiKey]
+        
+        _httpClient = HttpClient(baseUrlString:baseUrl, httpHeaders: headers)
+        _asyncHttpClient = AsyncHttpClient(queue: queue, baseUrlString:baseUrl, httpHeaders: headers)
+        self.queue = queue
     }
     
     func heartbeat() throws -> ApiHeartbeatResponse {
@@ -60,40 +67,72 @@ class StockFighterApiClient {
         return try ApiHeartbeatResponse(dictionary: d)
     }
     
+    @warn_unused_result
+    func heartbeatAsync() -> AnyObservable<ApiHeartbeatResponse> {
+        return _asyncHttpClient.get("heartbeat").map{ any in
+            guard let d = any as? [String:AnyObject] else { throw ApiErrors.BadJson }
+            return try ApiHeartbeatResponse(dictionary: d)
+        }
+    }
+    
     func venue(account account:String, name:String) -> Venue {
-        return Venue(httpClient: _httpClient, account:account, name: name)
+        return Venue(apiClient: self, account:account, name: name)
     }
 }
 
 class Venue {
     
-    private let _httpClient:HttpClient
+    private let _apiClient:StockFighterApiClient
     let account:String
     let name:String
     
-    init(httpClient:HttpClient, account:String, name:String) {
-        _httpClient = httpClient
+    init(apiClient:StockFighterApiClient, account:String, name:String) {
+        _apiClient = apiClient
         self.account = account
         self.name = name
     }
     
     func heartbeat() throws -> VenueHeartbeatResponse {
-        guard let d = try _httpClient.get("venues/\(name)/heartbeat") as? [String:AnyObject] else { throw ApiErrors.BadJson }
+        guard let d = try _apiClient._httpClient.get("venues/\(name)/heartbeat") as? [String:AnyObject] else { throw ApiErrors.BadJson }
         return try VenueHeartbeatResponse(dictionary: d)
     }
     
+    @warn_unused_result
+    func heartbeatAsync() -> AnyObservable<VenueHeartbeatResponse> {
+        return _apiClient._asyncHttpClient.get("venues/\(name)/heartbeat").map{ any in
+            guard let d = any as? [String:AnyObject] else { throw ApiErrors.BadJson }
+            return try VenueHeartbeatResponse(dictionary: d)
+        }
+    }
+    
     func stocks() throws -> StocksResponse {
-        guard let d = try _httpClient.get("venues/\(name)/stocks") as? [String:AnyObject] else { throw ApiErrors.BadJson }
+        guard let d = try _apiClient._httpClient.get("venues/\(name)/stocks") as? [String:AnyObject] else { throw ApiErrors.BadJson }
         return try StocksResponse(dictionary: d)
     }
     
+    @warn_unused_result
+    func stocksAsync() -> AnyObservable<StocksResponse> {
+        return _apiClient._asyncHttpClient.get("venues/\(name)/stocks").map{ any in
+            guard let d = any as? [String:AnyObject] else { throw ApiErrors.BadJson }
+            return try StocksResponse(dictionary: d)
+        }
+    }
+    
     func orderBookForStock(symbol:String) throws -> OrderBookResponse {
-        guard let d = try _httpClient.get("venues/\(name)/stocks/\(symbol)") as? [String:AnyObject] else { throw ApiErrors.BadJson }
+        guard let d = try _apiClient._httpClient.get("venues/\(name)/stocks/\(symbol)") as? [String:AnyObject] else { throw ApiErrors.BadJson }
         return try OrderBookResponse(dictionary: d)
     }
     
+    @warn_unused_result
+    func orderBookForStockAsync(symbol:String) -> AnyObservable<OrderBookResponse> {
+        return _apiClient._asyncHttpClient.get("venues/\(name)/stocks/\(symbol)").map{ any in
+            guard let d = any as? [String:AnyObject] else { throw ApiErrors.BadJson }
+            return try OrderBookResponse(dictionary: d)
+        }
+    }
+    
     func quoteForStock(symbol:String) throws -> QuoteResponse {
-        guard let d = try _httpClient.get("venues/\(name)/stocks/\(symbol)/quote") as? [String:AnyObject] else { throw ApiErrors.BadJson }
+        guard let d = try _apiClient._httpClient.get("venues/\(name)/stocks/\(symbol)/quote") as? [String:AnyObject] else { throw ApiErrors.BadJson }
         return try QuoteResponse(dictionary: d)
     }
     
@@ -108,12 +147,30 @@ class Venue {
             "orderType":type.rawValue
         ]
 
-        guard let d = try _httpClient.post("venues/\(name)/stocks/\(symbol)/orders", body: request) as? [String:AnyObject] else { throw ApiErrors.BadJson }
+        guard let d = try _apiClient._httpClient.post("venues/\(name)/stocks/\(symbol)/orders", body: request) as? [String:AnyObject] else { throw ApiErrors.BadJson }
         return try OrderResponse(dictionary: d)
     }
     
+    @warn_unused_result
+    func placeOrderForStockAsync(symbol:String, price:Int, qty:Int, direction:OrderDirection, type:OrderType = .Limit) -> AnyObservable<OrderResponse> {
+        let request:[String:AnyObject] = [
+            "account":account,
+            "venue":name,
+            "stock":symbol,
+            "price":price,
+            "qty":qty,
+            "direction":direction.rawValue,
+            "orderType":type.rawValue
+        ]
+
+        return _apiClient._asyncHttpClient.post("venues/\(name)/stocks/\(symbol)/orders", body: request).map{ any in
+            guard let d = any as? [String:AnyObject] else { throw ApiErrors.BadJson }
+            return try OrderResponse(dictionary: d)
+        }
+    }
+    
     func orderStatusForStock(symbol:String, id:Int) throws -> OrderResponse {
-        guard let d = try _httpClient.get("venues/\(name)/stocks/\(symbol)/orders/\(id)") as? [String:AnyObject] else { throw ApiErrors.BadJson }
+        guard let d = try _apiClient._httpClient.get("venues/\(name)/stocks/\(symbol)/orders/\(id)") as? [String:AnyObject] else { throw ApiErrors.BadJson }
         return try OrderResponse(dictionary: d)
     }
     
@@ -121,7 +178,7 @@ class Venue {
     - Returns: Array of OrderResponse
      - Throws: ApiErrors.BadJson, ApiErrors.CantParseDate or an NSError */
     func accountOrderStatus() throws -> [OrderResponse] {
-        let raw = try _httpClient.get("venues/\(name)/accounts/\(account)/orders")
+        let raw = try _apiClient._httpClient.get("venues/\(name)/accounts/\(account)/orders")
         guard let dict = raw as? [String:AnyObject] else { throw ApiErrors.BadJson }
         guard let orders = dict["orders"] as? [[String:AnyObject]] else { throw ApiErrors.BadJsonForKey("orders") }
         return try orders.map{ order in try OrderResponse(dictionary: order) }
@@ -132,7 +189,7 @@ class Venue {
     - Returns: Array of OrderResponse
     - Throws: ApiErrors.BadJson, ApiErrors.CantParseDate or an NSError */
     func accountOrderStatusForStock(symbol:String) throws -> [OrderResponse] {
-        let raw = try _httpClient.get("venues/\(name)/accounts/\(account)/stocks/\(symbol)/orders")
+        let raw = try _apiClient._httpClient.get("venues/\(name)/accounts/\(account)/stocks/\(symbol)/orders")
         guard let dict = raw as? [String:AnyObject] else { throw ApiErrors.BadJson }
         guard let orders = dict["orders"] as? [[String:AnyObject]] else { throw ApiErrors.BadJsonForKey("orders") }
         return try orders.map{ order in try OrderResponse(dictionary: order) }
@@ -145,19 +202,27 @@ class Venue {
     - Returns: an OrderResponse
     - Throws: ApiErrors.BadJson, ApiErrors.CantParseDate or an NSError */
     func cancelOrderForStock(symbol:String, id:Int) throws -> OrderResponse {
-        guard let d = try _httpClient.delete("venues/\(name)/stocks/\(symbol)/orders/\(id)") as? [String:AnyObject] else { throw ApiErrors.BadJson }
+        guard let d = try _apiClient._httpClient.delete("venues/\(name)/stocks/\(symbol)/orders/\(id)") as? [String:AnyObject] else { throw ApiErrors.BadJson }
         return try OrderResponse(dictionary: d)
     }
     
+    @warn_unused_result
+    func cancelOrderForStockAsync(symbol:String, id:Int) -> AnyObservable<OrderResponse> {
+        return _apiClient._asyncHttpClient.delete("venues/\(name)/stocks/\(symbol)/orders/\(id)").map{ any in
+            guard let d = any as? [String:AnyObject] else { throw ApiErrors.BadJson }
+            return try OrderResponse(dictionary: d)
+        }
+    }
+    
     // returns a websocketClient. It's up to the caller to close the client when done
-    func tickerTape(queue queue:dispatch_queue_t, callback:(QuoteResponse) -> Void) -> WebSocketClient {
+    func tickerTape(callback:(QuoteResponse) -> Void) -> WebSocketClient {
         let url = NSURL(string: "wss://api.stockfighter.io/ob/api/ws/\(account)/venues/\(name)/tickertape")!
         return WebSocketClient(url: url, queue: queue){ obj in
             self.processTickerTapeResponse(obj, callback: callback)
         }
     }
     
-    func tickerTapeForStock(symbol:String, queue:dispatch_queue_t, callback:(QuoteResponse) -> Void) -> WebSocketClient {
+    func tickerTapeForStock(symbol:String, callback:(QuoteResponse) -> Void) -> WebSocketClient {
         let url = NSURL(string: "wss://api.stockfighter.io/ob/api/ws/\(account)/venues/\(name)/tickertape/stocks/\(symbol)")!
         return WebSocketClient(url: url, queue: queue){ obj in
             self.processTickerTapeResponse(obj, callback: callback)
