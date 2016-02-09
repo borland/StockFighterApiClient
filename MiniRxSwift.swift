@@ -2,9 +2,10 @@
 //  MiniRxSwift.swift
 //
 //  Created by Orion Edwards on 8/02/16.
-//  Copyright © 2016 Orion Edwards. All rights reserved.
+//  Copyright © 2016 Orion Edwards. Licensed under the MIT License
+//  https://opensource.org/licenses/MIT
 //
-// Implements a minimal subset of the Reactive framework (loosely based on RxSwift but more from my C# background knowledge)
+// Implements a minimal subset of the Reactive framework (should be compatible with RxSwift)
 // which lets us write async methods much more nicely
 
 import Foundation
@@ -26,11 +27,12 @@ protocol DisposableType {
     func dispose()
 }
 
+/** Swift doesn't allow equality checking of closures, so we assign an arbitrary id to observers so we can compare/remove them */
 private var _anyObserverIdCounter:Int32 = 0
 
 /** Type-Erasing bridge between Observer protocol and a class we can stick in a collection:
  http://krakendev.io/blog/generic-protocols-and-their-shortcomings */
-class AnyObserver<T> : ObserverType, Equatable {
+class Observer<T> : ObserverType, Equatable {
     typealias ValueType = T
     
     private let _id:Int32
@@ -39,6 +41,7 @@ class AnyObserver<T> : ObserverType, Equatable {
     private let _onError: (ErrorType -> Void)
     private let _onCompleted: (Void -> Void)
     
+    /** Create an anonymous observer wrapping up to 3 closures */
     init(next:(T throws -> Void)? = nil, error:(ErrorType -> Void)? = nil, completed:(Void -> Void)? = nil) {
         _id = OSAtomicIncrement32(&_anyObserverIdCounter)
         
@@ -61,12 +64,14 @@ class AnyObserver<T> : ObserverType, Equatable {
         }
     }
     
+    /** Create an anonymous observer wrapping an existing ObserverType. This is needed to bridge between protocols and generics */
     required init <O: ObserverType where O.ValueType == T>(_ observer:O) {
         _id = OSAtomicIncrement32(&_anyObserverIdCounter)
         _onNext = observer.onNext
         _onError = observer.onError
         _onCompleted = observer.onCompleted
     }
+    
     func onNext(value: T) {
         do {
             try _onNext(value)
@@ -74,44 +79,91 @@ class AnyObserver<T> : ObserverType, Equatable {
             _onError(error)
         }
     }
+    
     func onError(error: ErrorType) {
         _onError(error)
     }
+    
     func onCompleted() {
         _onCompleted()
     }
 }
-// our wrapper also supports equality so we can remove them from arrays
-func ==<T>(lhs:AnyObserver<T>, rhs:AnyObserver<T>) -> Bool {
+// our Observer wrapper supports equality so we can remove them from arrays
+func ==<T>(lhs:Observer<T>, rhs:Observer<T>) -> Bool {
     return lhs._id == rhs._id
 }
 
 /** Type-Erasing bridge between Observable protocol and a class we can stick in a variable */
-class AnyObservable<T> : ObservableType {
+class Observable<T> : ObservableType {
     typealias ValueType = T
     
-    private let _subscribe: (AnyObserver<T> -> DisposableType)
+    private let _subscribe: (Observer<T> -> DisposableType)
     
-    /** Init with a closure (basically being an AnonymousObservable) */
-    required init(subscribe: (AnyObserver<T> -> DisposableType)) {
+    /** Init with a closure */
+    required init(subscribe: (Observer<T> -> DisposableType)) {
         _subscribe = subscribe
     }
-    /** Init by wrapping ObservableType (basically being an AnyObservable) */
+    /** Init by wrapping ObservableType (bridge between protocols and generics) */
     required init<O : ObservableType where O.ValueType == T>(_ observable:O) {
         _subscribe = observable.subscribe
     }
     func subscribe<O : ObserverType where O.ValueType == ValueType>(observer: O) -> DisposableType {
-        return _subscribe(AnyObserver(observer))
+        return _subscribe(Observer(observer))
+    }
+    
+    /** Creates a new observable by calling your closure to perform some operation:
+    http://www.introtorx.com/content/v1.0.10621.0/04_CreatingObservableSequences.html#ObservableCreate */
+    @warn_unused_result
+    static func create(subscribe: (Observer<T> -> DisposableType)) -> Observable<T> {
+        return Observable(subscribe: subscribe)
+    }
+    
+    /** Creates a new observable which returns the given error:
+    http://www.introtorx.com/content/v1.0.10621.0/04_CreatingObservableSequences.html#ObservableThrow */
+    @warn_unused_result
+    static func error(err:ErrorType) -> Observable<T> {
+        var disposed = false
+        
+        return create{ observer in
+            if !disposed {
+                observer.onError(err)
+            }
+            return AnonymousDisposable{
+                disposed = true
+            }
+        }
+    }
+    
+    /** Creates a new observable which completes immediately with no value:
+    http://www.introtorx.com/content/v1.0.10621.0/04_CreatingObservableSequences.html#ObservableEmpty */
+    @warn_unused_result
+    static func empty() -> Observable<T> {
+        return create{ observer in
+            observer.onCompleted()
+            return AnonymousDisposable{ _ in }
+        }
+    }
+    
+    /** Creates a new observable which immediately returns the provided value, then completes:
+    http://www.introtorx.com/content/v1.0.10621.0/04_CreatingObservableSequences.html#ObservableReturn */
+    @warn_unused_result
+    static func just(value:T) -> Observable<T> {
+        return create{ observer in
+            observer.onNext(value)
+            observer.onCompleted()
+            return AnonymousDisposable{ _ in }
+        }
     }
 }
 
-/** Thread-safe */
+/** Represents an Event Source that you can use to publish values:
+http://www.introtorx.com/content/v1.0.10621.0/02_KeyTypes.html#Subject */
 class Subject<T> : ObserverType, ObservableType {
     typealias ValueType = T
-    private var _subscribers:[AnyObserver<T>] = []
+    private var _subscribers:[Observer<T>] = []
     
     func subscribe<O : ObserverType where O.ValueType == T>(observer: O) -> DisposableType {
-        let wrapper = AnyObserver(observer)
+        let wrapper = Observer(observer)
         lock(self) {
             _subscribers.append(wrapper)
         }
@@ -141,30 +193,30 @@ class Subject<T> : ObserverType, ObservableType {
 extension ObservableType {
     /** type erasing wrapper */
     @warn_unused_result
-    func asObservable() -> AnyObservable<ValueType> {
-        return AnyObservable(self)
+    func asObservable() -> Observable<ValueType> {
+        return Observable(self)
     }
     func subscribe() {
-        subscribe(AnyObserver(next: { _ in }))
+        subscribe(Observer(next: { _ in }))
     }
     func subscribeNext(next:(ValueType throws -> Void)) {
-        subscribe(AnyObserver(next: next))
+        subscribe(Observer(next: next))
     }
     func subscribeError(error:(ErrorType) -> Void ) {
-        subscribe(AnyObserver(error: error))
+        subscribe(Observer(error: error))
     }
     func subscribeCompleted(completed:() -> Void ) {
-        subscribe(AnyObserver(completed: completed))
+        subscribe(Observer(completed: completed))
     }
     func subscribeNext(next:(ValueType) -> Void, error:(ErrorType) -> Void) {
-        subscribe(AnyObserver(next: next, error: error))
+        subscribe(Observer(next: next, error: error))
     }
     func subscribeNext(next:(ValueType) -> Void, error:(ErrorType) -> Void, completed:() -> Void) {
-        subscribe(AnyObserver(next: next, error: error, completed: completed))
+        subscribe(Observer(next: next, error: error, completed: completed))
     }
 }
 
-class AnonymousDisposable : DisposableType {
+private class AnonymousDisposable : DisposableType {
     private let _dispose:(Void -> Void)
     
     required init(dispose:(Void -> Void)) {
@@ -175,18 +227,82 @@ class AnonymousDisposable : DisposableType {
     }
 }
 
-@warn_unused_result
-func createObservable<T>(subscribe: (AnyObserver<T> -> DisposableType)) -> AnyObservable<T> {
-    return AnyObservable(subscribe: subscribe)
+class Disposable {
+    static func create(dispose:(Void->Void)) -> DisposableType {
+        return AnonymousDisposable(dispose: dispose)
+    }
+}
+
+class CompositeDisposable : DisposableType {
+    private var _disposables:[DisposableType] = []
+    private var _disposed = false
+    
+    init() { }
+    
+    init(disposables:[DisposableType]) {
+        _disposables.appendContentsOf(disposables)
+    }
+    
+    func add(disposable:DisposableType) {
+        lock(self) {
+            if _disposed {
+                disposable.dispose()
+                return
+            }
+            _disposables.append(disposable)
+        }
+    }
+    
+    func dispose() {
+        let copy:[DisposableType] = lock(self) {
+            _disposed = true
+            return _disposables
+        }
+        for d in copy { d.dispose() }
+    }
+}
+
+class SerialDisposable : DisposableType {
+    private var _disposable:DisposableType?
+    private var _disposed = false
+    init() {}
+    
+    init(disposable:DisposableType) {
+        _disposable = disposable
+    }
+    
+    var disposable:DisposableType? {
+        get { return _disposable }
+        set {
+            if let old:DisposableType = lock(self, block: {
+                let x = _disposable
+                _disposable = newValue
+                return x
+            }) {
+                old.dispose()
+            }
+        }
+    }
+    
+    func dispose() {
+        if let copy:DisposableType = lock(self, block: {
+            let x = _disposable
+            _disposable = nil
+            return x
+        }) {
+            copy.dispose()
+        }
+    }
 }
 
 /** Linq */
 extension ObservableType {
     
+    // untested
     @warn_unused_result
-    func map<R>(transform: (ValueType throws -> R)) -> AnyObservable<R> {
-        return createObservable({ (observer) -> DisposableType in
-            self.subscribe(AnyObserver( // TODO why must we wrap this in AnyObserver?
+    func map<R>(transform: (ValueType throws -> R)) -> Observable<R> {
+        return Observable.create { observer in
+            self.subscribe(Observer( // TODO why must we wrap this in AnyObserver?
                 next: { (value) -> Void in
                     do {
                         observer.onNext(try transform(value))
@@ -196,13 +312,54 @@ extension ObservableType {
                 },
                 error: observer.onError,
                 completed: observer.onCompleted))
-        })
+        }
     }
     
+    // untested
     @warn_unused_result
-    func filter(predicate: (ValueType throws -> Bool)) -> AnyObservable<ValueType> {
-        return createObservable({ (observer) -> DisposableType in
-            self.subscribe(AnyObserver( // TODO why must we wrap this in AnyObserver?
+    func flatMap<T:ObservableType, R where T.ValueType == R>(transform: (ValueType throws -> T)) -> Observable<R> {
+        return Observable.create { observer in
+            let group = CompositeDisposable()
+            var count:Int32 = 1
+            let completionHandler = {
+                let newCount = OSAtomicDecrement32(&count)
+                if newCount == 0 { // all done
+                    observer.onCompleted()
+                }
+            }
+            
+            group.add(self.subscribe(Observer( // TODO why must we wrap this in AnyObserver?
+                next: { (value) -> Void in
+                    do {
+                        OSAtomicIncrement32(&count)
+                        let innerDisposable = (try transform(value)).subscribe(Observer(
+                            next: { (v) in
+                                observer.onNext(v)
+                            },
+                            error: { err in
+                                group.dispose()
+                                observer.onError(err)
+                            },
+                            completed: completionHandler))
+                        group.add(innerDisposable)
+                        
+                    } catch let error {
+                        group.dispose()
+                        observer.onError(error)
+                    }
+                },
+                error: observer.onError,
+                completed: completionHandler)))
+            
+            return group
+        }
+    }
+    
+    // untested
+    @warn_unused_result
+    func filter(predicate: (ValueType throws -> Bool)) -> Observable<ValueType> {
+        return Observable.create { (observer) -> DisposableType in
+            self.subscribe(Observer( // TODO why must we wrap this in AnyObserver?
                 next: { (value) -> Void in
                     do {
                         if try predicate(value) {
@@ -214,30 +371,6 @@ extension ObservableType {
                 },
                 error: observer.onError,
                 completed: observer.onCompleted))
-        })
-    }
-}
-
-class Observable {
-    @warn_unused_result
-    static func error<T>(err:ErrorType) -> AnyObservable<T> {
-        var disposed = false
-        
-        return createObservable{ observer in
-            if !disposed {
-                observer.onError(err)
-            }
-            return AnonymousDisposable{
-                disposed = true
-            }
-        }
-    }
-    
-    @warn_unused_result
-    static func empty<T>() -> AnyObservable<T> {
-        return createObservable{ observer in
-            observer.onCompleted()
-            return AnonymousDisposable{ _ in }
         }
     }
 }

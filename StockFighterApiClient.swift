@@ -68,7 +68,7 @@ class StockFighterApiClient {
     }
     
     @warn_unused_result
-    func heartbeatAsync() -> AnyObservable<ApiHeartbeatResponse> {
+    func heartbeatAsync() -> Observable<ApiHeartbeatResponse> {
         return _asyncHttpClient.get("heartbeat").map{ any in
             guard let d = any as? [String:AnyObject] else { throw ApiErrors.BadJson }
             return try ApiHeartbeatResponse(dictionary: d)
@@ -98,7 +98,7 @@ class Venue {
     }
     
     @warn_unused_result
-    func heartbeatAsync() -> AnyObservable<VenueHeartbeatResponse> {
+    func heartbeatAsync() -> Observable<VenueHeartbeatResponse> {
         return _apiClient._asyncHttpClient.get("venues/\(name)/heartbeat").map{ any in
             guard let d = any as? [String:AnyObject] else { throw ApiErrors.BadJson }
             return try VenueHeartbeatResponse(dictionary: d)
@@ -111,7 +111,7 @@ class Venue {
     }
     
     @warn_unused_result
-    func stocksAsync() -> AnyObservable<StocksResponse> {
+    func stocksAsync() -> Observable<StocksResponse> {
         return _apiClient._asyncHttpClient.get("venues/\(name)/stocks").map{ any in
             guard let d = any as? [String:AnyObject] else { throw ApiErrors.BadJson }
             return try StocksResponse(dictionary: d)
@@ -124,7 +124,7 @@ class Venue {
     }
     
     @warn_unused_result
-    func orderBookForStockAsync(symbol:String) -> AnyObservable<OrderBookResponse> {
+    func orderBookForStockAsync(symbol:String) -> Observable<OrderBookResponse> {
         return _apiClient._asyncHttpClient.get("venues/\(name)/stocks/\(symbol)").map{ any in
             guard let d = any as? [String:AnyObject] else { throw ApiErrors.BadJson }
             return try OrderBookResponse(dictionary: d)
@@ -152,7 +152,7 @@ class Venue {
     }
     
     @warn_unused_result
-    func placeOrderForStockAsync(symbol:String, price:Int, qty:Int, direction:OrderDirection, type:OrderType = .Limit) -> AnyObservable<OrderResponse> {
+    func placeOrderForStockAsync(symbol:String, price:Int, qty:Int, direction:OrderDirection, type:OrderType = .Limit) -> Observable<OrderResponse> {
         let request:[String:AnyObject] = [
             "account":account,
             "venue":name,
@@ -207,7 +207,7 @@ class Venue {
     }
     
     @warn_unused_result
-    func cancelOrderForStockAsync(symbol:String, id:Int) -> AnyObservable<OrderResponse> {
+    func cancelOrderForStockAsync(symbol:String, id:Int) -> Observable<OrderResponse> {
         return _apiClient._asyncHttpClient.delete("venues/\(name)/stocks/\(symbol)/orders/\(id)").map{ any in
             guard let d = any as? [String:AnyObject] else { throw ApiErrors.BadJson }
             return try OrderResponse(dictionary: d)

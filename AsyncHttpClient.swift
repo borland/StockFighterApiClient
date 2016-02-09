@@ -2,7 +2,8 @@
 //  AsyncHttpClient.swift
 //
 //  Created by Orion Edwards on 8/02/16.
-//  Copyright © 2016 Orion Edwards. All rights reserved.
+//  Copyright © 2016 Orion Edwards. Licensed under the MIT License
+//  https://opensource.org/licenses/MIT
 //
 
 import Foundation
@@ -41,7 +42,7 @@ class AsyncHttpClient : NSObject, NSURLSessionDelegate, NSURLSessionDataDelegate
      - Returns: The response from the server deserialized via `NSJSONSerialization.JSONObjectWithData`
      - Throws: An NSError from JSON de/serialization or an error from `HttpErrors`  */
     @warn_unused_result
-    func get(path:String) -> AnyObservable<AnyObject>  {
+    func get(path:String) -> Observable<AnyObject>  {
         return sendRequest(NSURLRequest(URL: urlForPath(path)))
     }
     
@@ -53,7 +54,7 @@ class AsyncHttpClient : NSObject, NSURLSessionDelegate, NSURLSessionDataDelegate
      - Returns: The response from the server deserialized via `NSJSONSerialization.JSONObjectWithData`
      - Throws: An NSError from JSON de/serialization or an error from `HttpErrors` for invalid HTTP response code, etc */
     @warn_unused_result
-    func post(path:String, body:AnyObject? = nil) -> AnyObservable<AnyObject> {
+    func post(path:String, body:AnyObject? = nil) -> Observable<AnyObject> {
         let request = NSMutableURLRequest(URL: urlForPath(path))
         request.HTTPMethod = "POST"
         if let b = body {
@@ -72,7 +73,7 @@ class AsyncHttpClient : NSObject, NSURLSessionDelegate, NSURLSessionDataDelegate
      - Returns: The response from the server deserialized via `NSJSONSerialization.JSONObjectWithData`
      - Throws: An NSError from JSON de/serialization or an error from `HttpErrors`  */
     @warn_unused_result
-    func delete(path:String) -> AnyObservable<AnyObject> {
+    func delete(path:String) -> Observable<AnyObject> {
         let request = NSMutableURLRequest(URL: urlForPath(path))
         request.HTTPMethod = "DELETE"
         return sendRequest(request)
@@ -86,10 +87,10 @@ class AsyncHttpClient : NSObject, NSURLSessionDelegate, NSURLSessionDataDelegate
     }
     
     @warn_unused_result
-    private func sendRequest(request:NSURLRequest) -> AnyObservable<AnyObject> {
+    private func sendRequest(request:NSURLRequest) -> Observable<AnyObject> {
         let urlSession = _session
-        return createObservable({ observer in
-            let task = urlSession.dataTaskWithRequest(request) { (returnedData, urlResponse, anyError) -> Void in
+        return Observable.create { observer in
+            let task = urlSession.dataTaskWithRequest(request) { (returnedData, urlResponse, anyError) in
                 if let err = anyError {
                     observer.onError(err)
                     return
@@ -114,9 +115,9 @@ class AsyncHttpClient : NSObject, NSURLSessionDelegate, NSURLSessionDataDelegate
             }
             task.resume()
             
-            return AnonymousDisposable{ [weak task] in
+            return Disposable.create{ [weak task] in
                 if let t = task { t.cancel() }
             }
-        })
+        }
     }
 }
