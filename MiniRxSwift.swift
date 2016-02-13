@@ -274,7 +274,7 @@ class SerialDisposable : DisposableType {
     var disposable:DisposableType? {
         get { return _disposable }
         set {
-            if let old:DisposableType = lock(self, block: {
+            if let old:DisposableType = lock(self, {
                 let x = _disposable
                 _disposable = newValue
                 return x
@@ -285,7 +285,7 @@ class SerialDisposable : DisposableType {
     }
     
     func dispose() {
-        if let copy:DisposableType = lock(self, block: {
+        if let copy:DisposableType = lock(self, {
             let x = _disposable
             _disposable = nil
             return x

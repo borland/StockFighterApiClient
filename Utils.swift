@@ -11,7 +11,7 @@ import Foundation
 /** Swift variant of C#'s lock statement which calls `objc_sync_enter` and guarantees to call `objc_sync_exit`
 - Parameter object: The object to lock.
 - Paremeter block: Code to run while the lock is acquired */
-func lock<T>(object:AnyObject, @noescape block:() throws -> T) rethrows -> T {
+func lock<T>(object:AnyObject, @noescape _ block:() throws -> T) rethrows -> T {
     objc_sync_enter(object)
     defer{ objc_sync_exit(object) }
     

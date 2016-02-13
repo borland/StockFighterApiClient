@@ -410,7 +410,7 @@ struct OrderResponse {
     let account:String
     let timeStamp:NSDate // ISO-8601 timestamp for when we received order
     let fills:[OrderFill] // may have zero or multiple fills.
-    let totalFilled:Int
+    let totalFilled:Int // Docs don't explain this. Logically it's fills.reduce(0){ $0 + $1.qty}, but turns out to be slightly off for no reason. Ignore it
     let open:Bool
     
     init(dictionary d:[String:AnyObject]) throws {
