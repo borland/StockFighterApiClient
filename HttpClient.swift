@@ -153,3 +153,10 @@ class HttpClient : NSObject, NSURLSessionDelegate, NSURLSessionDataDelegate {
         }
     }
 }
+
+func lock<T>(object:AnyObject, @noescape _ block:() throws -> T) rethrows -> T {
+    objc_sync_enter(object)
+    defer{ objc_sync_exit(object) }
+    
+    return try block()
+}
